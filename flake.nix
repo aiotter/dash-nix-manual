@@ -34,7 +34,8 @@
                 NIX_CONFIG = "cores = 0";
               }
               ''
-                nix __dump-language >"$out"
+                mkdir -p "$out"
+                nix __dump-language >"$out/builtins.json"
               '';
 
           builtins-html =
@@ -45,7 +46,8 @@
                 reader = ./builtins-reader.lua;
               }
               ''
-                pandoc --standalone -f "$reader" -t html "$input" >"$out"
+                mkdir -p "$out"
+                pandoc --standalone -f "$reader" -t html "$input/builtins.json" >"$out/builtins.html"
               '';
 
           docset =
@@ -73,7 +75,8 @@
                 }
                 |> builtins.toFile "pandoc-options.json";
             in
-            pkgs.stdenv.mkDerivation rec {
+            with self.packages.${system};
+            pkgs.stdenv.mkDerivation {
               # https://kapeli.com/docsets#dashDocset
               pname = "nix-docset";
               version = "nix-${nix-version}+nixpkgs-${nixpkgs-version}";
@@ -83,9 +86,13 @@
                 pandoc
               ];
 
-              src = self.packages.${system}.nixpkgs-lib-markdown;
+              srcs = [
+                nixpkgs-lib-markdown
+                builtins-html
+              ];
+
               sourceRoot = ".";
-              postUnpack = "rm ${src.name}/index.md";
+              postUnpack = "rm ${nixpkgs-lib-markdown.name}/index.md";
 
               dirname = "nix.docset";
 
@@ -95,15 +102,16 @@
                 mkdir -p "$dirname/Contents/Resources/Documents"
                 cp ${./Info.plist} "$dirname/Contents/Info.plist"
 
+                local workdir="$(pwd)"
                 pushd "$dirname/Contents/Resources/Documents"
 
-                for file in "$(dirs +1)/${src.name}"/*.md; do
+                for file in "$workdir/${nixpkgs-lib-markdown.name}"/*.md; do
                   local title="lib.$(basename "$file" .md)"
                   local output_file="$(basename "$file" .md).html"
                   pandoc "$file" --defaults=${pandoc-options} --metadata title="$title" -o "$output_file"
                 done
 
-                pandoc -f html "${self.packages.${system}.builtins-html}" --defaults=${pandoc-options} -o "builtins.html"
+                pandoc "$workdir/${builtins-html.name}/builtins.html" -f html --defaults=${pandoc-options} -o "builtins.html"
 
                 popd
 
