@@ -122,5 +122,31 @@
             };
         }
       );
+
+      apps = nixpkgs.lib.genAttrs nixpkgs.lib.systems.flakeExposed (
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        {
+          default = self.apps.${system}.generate-docset;
+
+          generate-docset = {
+            type = "app";
+            program =
+              let
+                docset = self.packages.${system}.docset;
+              in
+              builtins.toString (
+                pkgs.writeShellScript "generate-docset" ''
+                  [[ -d ./${docset.dirname} ]] && rm -rf ./${docset.dirname}
+                  cp -r "${docset}/${docset.dirname}" ./${docset.dirname}
+                  chmod -R +rwx ./${docset.dirname}
+                ''
+              );
+            meta.description = "Generate docset on the current directory";
+          };
+        }
+      );
     };
 }
