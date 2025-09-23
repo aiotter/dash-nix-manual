@@ -10,7 +10,8 @@
         system:
         let
           pkgs = import nixpkgs { inherit system; };
-          inherit (pkgs.nix) version;
+          nix-version = pkgs.nix.version;
+          nixpkgs-version = pkgs.lib.trivial.version;
         in
         {
           default = self.packages.${system}.docset;
@@ -21,7 +22,7 @@
           nixpkgs-lib-markdown = pkgs.nixpkgs-manual.lib-docs;
 
           builtins-json =
-            pkgs.runCommandNoCC "builtins.json"
+            pkgs.runCommandNoCC "nix-builtins-json-${nix-version}"
               {
                 nativeBuildInputs = [ pkgs.nixVersions.latest ];
 
@@ -37,7 +38,7 @@
               '';
 
           builtins-html =
-            pkgs.runCommandNoCC "builtins.html"
+            pkgs.runCommandNoCC "nix-builtins-html-${nix-version}"
               {
                 nativeBuildInputs = with pkgs; [ pandoc ];
                 input = self.packages.${system}.builtins-json;
@@ -75,7 +76,7 @@
             pkgs.stdenv.mkDerivation rec {
               # https://kapeli.com/docsets#dashDocset
               pname = "nix-docset";
-              inherit version;
+              version = "nix-${nix-version}+nixpkgs-${nixpkgs-version}";
 
               nativeBuildInputs = with pkgs; [
                 sqlite
@@ -102,7 +103,7 @@
                   pandoc "$file" --defaults=${pandoc-options} --metadata title="$title" -o "$output_file"
                 done
 
-                pandoc "${self.packages.${system}.builtins-html}" --defaults=${pandoc-options} -o "builtins.html"
+                pandoc -f html "${self.packages.${system}.builtins-html}" --defaults=${pandoc-options} -o "builtins.html"
 
                 popd
 
