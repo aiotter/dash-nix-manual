@@ -5,7 +5,7 @@
 	<key>CFBundleIdentifier</key>
 	<string>nix</string>
 	<key>CFBundleName</key>
-	<string>nix</string>
+	<string>Nix &amp; Nixpkgs</string>
 	<key>DocSetPlatformFamily</key>
 	<string>nix</string>
 	<key>isDashDocset</key>
