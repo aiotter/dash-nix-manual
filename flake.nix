@@ -152,6 +152,9 @@
                 popd
 
                 mv "$dirname/Contents/Resources/Documents/docSet.dsidx" "$dirname/Contents/Resources/docSet.dsidx"
+                
+                cp "${pkgs.nixos-icons}/share/icons/hicolor/16x16/apps/nix-snowflake.png" "$dirname/icon.png"
+                cp "${pkgs.nixos-icons}/share/icons/hicolor/32x32/apps/nix-snowflake.png" "$dirname/icon@2x.png"
 
                 runHook postBuild
               '';
