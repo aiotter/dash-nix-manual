@@ -1,8 +1,11 @@
-local database_file = "docSet.dsidx"
-
 local sql_statements = {
   "CREATE TABLE IF NOT EXISTS searchIndex(id INTEGER PRIMARY KEY, name TEXT, type TEXT, path TEXT);",
   "CREATE UNIQUE INDEX IF NOT EXISTS anchor ON searchIndex (name, type, path);",
+}
+
+local metadata = {
+  database_file = "./docSet.dsidx",
+  menu_description = nil,
 }
 
 local function starts_with(str, prefix)
@@ -21,8 +24,12 @@ local function Header(elem)
     type = "Function"
   elseif starts_with(elem.identifier, "constant-") then
     type = "Constant"
+  elseif starts_with(elem.identifier, "sec-functions-library-") then
+    type = "Module"
   elseif starts_with(elem.identifier, "sec-") then
     type = "Section"
+  elseif elem.level == 1 then
+    type = "Guide"
   else
     return nil
   end
@@ -41,7 +48,7 @@ local function Header(elem)
     table.concat({
       string.format("<dash_entry_name=%s>", display_name),
       string.format("<dash_entry_originalName=%s>", heading),
-      string.format("<dash_entry_menuDescription=%s>", heading:gsub("^(.*)%..+$", "%1")),
+      string.format("<dash_entry_menuDescription=%s>", metadata.menu_description or heading:gsub("^(.*)%..+$", "%1")),
       string.format("./%s#%s", PANDOC_STATE.output_file, id),
     }):gsub("'", "''")
   )
@@ -52,10 +59,16 @@ end
 
 
 return {
+  Meta = function(meta)
+    for key, value in pairs(meta) do
+      metadata[key] = value
+    end
+  end,
+
   Pandoc = function(doc)
     doc = doc:walk { Header = Header }
 
-    pandoc.pipe("sqlite3", {database_file}, table.concat(sql_statements, "\n"))
+    pandoc.pipe("sqlite3", {metadata.database_file}, table.concat(sql_statements, "\n"))
 
     return doc
   end,

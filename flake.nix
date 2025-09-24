@@ -89,6 +89,7 @@
               srcs = [
                 nixpkgs-lib-markdown
                 builtins-html
+                nixpkgs-doc
               ];
 
               sourceRoot = ".";
@@ -99,19 +100,54 @@
               buildPhase = ''
                 runHook preBuild
 
+                # Generate <style> tags for highlighting
+                echo '$highlighting-css$' >highlight.template.css
+                echo $'```html\n<p>placeholder</p>\n```' >placeholder.md
+                local highlight_css_light=$(pandoc --highlight-style=haddock --template=highlight.template.css placeholder.md)
+                local highlight_css_dark=$(pandoc --highlight-style=espresso --template=highlight.template.css placeholder.md)
+                local highlight_style_tags='<style media="screen and (prefers-color-scheme: light)">'"$highlight_css_light"'</style>'
+                highlight_style_tags+='<style media="screen and (prefers-color-scheme: dark)">'"$highlight_css_dark"'</style>'
+
+
                 mkdir -p "$dirname/Contents/Resources/Documents"
                 cp ${./Info.plist} "$dirname/Contents/Info.plist"
 
                 local workdir="$(pwd)"
                 pushd "$dirname/Contents/Resources/Documents"
 
+
+                # Generate document "nixpkgs-lib"
+                mkdir nixpkgs-lib
                 for file in "$workdir/${nixpkgs-lib-markdown.name}"/*.md; do
-                  local title="lib.$(basename "$file" .md)"
+                  local title="nixpkgs.lib.$(basename "$file" .md)"
                   local output_file="$(basename "$file" .md).html"
-                  pandoc "$file" --defaults=${pandoc-options} --metadata title="$title" -o "$output_file"
+                  pandoc "$file" --defaults="${pandoc-options}" -o "nixpkgs-lib/$output_file" \
+                    --metadata title="$title" \
+                    --metadata menu_description="$title"
                 done
 
+
+                # Generate document "builtins"
                 pandoc "$workdir/${builtins-html.name}/builtins.html" -f html --defaults=${pandoc-options} -o "builtins.html"
+
+
+                # Generate document "nixpkgs"
+                mkdir nixpkgs
+                cp -r "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/style.css" ./nixpkgs
+
+                pandoc "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/index.html" \
+                  --lua-filter="${./nixpkgs-preprocess-filter.lua}" \
+                  -t chunkedhtml -o "$workdir/nixpkgs-chunked-html"
+
+                for file in "$workdir/nixpkgs-chunked-html"/*.html; do
+                  local output_file="$(basename "$file")"
+                  pandoc "$file" --defaults="${pandoc-options}" --css="./style.css" \
+                    --highlight-style=monochrome \
+                    --variable header-includes="$highlight_style_tags" \
+                    --variable header-includes='<style>body > *:not(.book) { display: none; }</style>' \
+                    --metadata menu_description="nixpkgs" \
+                     -o "nixpkgs/$output_file"
+                done
 
                 popd
 
