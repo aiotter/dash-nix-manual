@@ -1,0 +1,12 @@
+variables:
+  header-includes: |
+    <style>
+      pre.sourceCode {
+        padding: 15px;
+      }
+      h2:not(:first-of-type) {
+        border-top: 1px solid darkgray;
+        margin-top: 2em;
+        padding-top: 2em;
+      }
+    </style>

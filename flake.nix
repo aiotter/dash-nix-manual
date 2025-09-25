@@ -43,7 +43,7 @@
               {
                 nativeBuildInputs = with pkgs; [ pandoc ];
                 input = self.packages.${system}.builtins-json;
-                reader = ./builtins-reader.lua;
+                reader = ./pandoc/custom/builtins-reader.lua;
               }
               ''
                 mkdir -p "$out"
@@ -51,30 +51,6 @@
               '';
 
           docset =
-            let
-              pandoc-options =
-                builtins.toJSON {
-                  standalone = true;
-                  highlight-style = "tango";
-                  filters = [ ./filter.lua ];
-                  variables = {
-                    header-includes = ''
-                      <style>
-                        pre.sourceCode {
-                          padding: 15px;
-                        }
-
-                        h2:not(:first-of-type) {
-                          border-top: 1px solid darkgray;
-                          margin-top: 2em;
-                          padding-top: 2em;
-                        }
-                      </style>
-                    '';
-                  };
-                }
-                |> builtins.toFile "pandoc-options.json";
-            in
             with self.packages.${system};
             pkgs.stdenv.mkDerivation {
               # https://kapeli.com/docsets#dashDocset
@@ -95,67 +71,87 @@
               sourceRoot = ".";
               postUnpack = "rm ${nixpkgs-lib-markdown.name}/index.md";
 
+              XDG_DATA_HOME = pkgs.symlinkJoin {
+                name = "xdg_data_home";
+                paths = [
+                  (pkgs.lib.fileset.toSource {
+                    root = ./.;
+                    fileset = ./pandoc;
+                  })
+                  (pkgs.runCommandCC "pandoc-highlighting-css" { nativeBuildInputs = [ pkgs.pandoc ]; } ''
+                    mkdir -p "$out/pandoc/defaults"
+                    echo '$highlighting-css$' >highlight.template.css
+                    echo $'```html\n<p>placeholder</p>\n```' >placeholder.md
+
+                    cat <<-EOF >"$out/pandoc/defaults/highlighting-css.yaml"
+                    	variables:
+                    	  highlighting-css: |
+                    	    @media (prefers-color-scheme: light) {
+                    	      $(pandoc --highlight-style=haddock --template=highlight.template.css placeholder.md | sed 's/^/      /')
+                    	    }
+                    	    @media (prefers-color-scheme: dark) {
+                    	      $(pandoc --highlight-style=espresso --template=highlight.template.css placeholder.md | sed 's/^/      /')
+                    	    }
+                    EOF
+                  '')
+                ];
+              };
+
               dirname = "nix.docset";
 
               buildPhase = ''
                 runHook preBuild
 
-                # Generate <style> tags for highlighting
-                echo '$highlighting-css$' >highlight.template.css
-                echo $'```html\n<p>placeholder</p>\n```' >placeholder.md
-                local highlight_css_light=$(pandoc --highlight-style=haddock --template=highlight.template.css placeholder.md)
-                local highlight_css_dark=$(pandoc --highlight-style=espresso --template=highlight.template.css placeholder.md)
-                local highlight_style_tags='<style media="screen and (prefers-color-scheme: light)">'"$highlight_css_light"'</style>'
-                highlight_style_tags+='<style media="screen and (prefers-color-scheme: dark)">'"$highlight_css_dark"'</style>'
-
-
                 mkdir -p "$dirname/Contents/Resources/Documents"
                 cp ${./Info.plist} "$dirname/Contents/Info.plist"
+                cp "${pkgs.nixos-icons}/share/icons/hicolor/16x16/apps/nix-snowflake.png" "$dirname/icon.png"
+                cp "${pkgs.nixos-icons}/share/icons/hicolor/32x32/apps/nix-snowflake.png" "$dirname/icon@2x.png"
+
 
                 local workdir="$(pwd)"
+                local database_file="$workdir/$dirname/Contents/Resources/docSet.dsidx"
                 pushd "$dirname/Contents/Resources/Documents"
 
 
-                # Generate document "nixpkgs-lib"
+                # Generate document for "nixpkgs.lib"
                 mkdir nixpkgs-lib
                 for file in "$workdir/${nixpkgs-lib-markdown.name}"/*.md; do
                   local title="nixpkgs.lib.$(basename "$file" .md)"
                   local output_file="$(basename "$file" .md).html"
-                  pandoc "$file" --defaults="${pandoc-options}" -o "nixpkgs-lib/$output_file" \
+                  pandoc "$file" -o "nixpkgs-lib/$output_file" \
+                    --defaults=create-docset.yaml \
+                    --defaults=add-margin-to-code-block.yaml \
+                    --metadata database_file="$database_file" \
                     --metadata title="$title" \
                     --metadata menu_description="$title"
                 done
 
 
-                # Generate document "builtins"
-                pandoc "$workdir/${builtins-html.name}/builtins.html" -f html --defaults=${pandoc-options} -o "builtins.html"
+                # Generate document for "builtins"
+                pandoc "$workdir/${builtins-html.name}/builtins.html" -o "builtins.html" \
+                  --defaults=create-docset.yaml \
+                  --defaults=add-margin-to-code-block.yaml \
+                  --metadata database_file="$database_file"
 
 
-                # Generate document "nixpkgs"
+                # Generate document for "nixpkgs"
                 mkdir nixpkgs
                 cp -r "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/style.css" ./nixpkgs
 
                 pandoc "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/index.html" \
-                  --lua-filter="${./nixpkgs-preprocess-filter.lua}" \
-                  -t chunkedhtml -o "$workdir/nixpkgs-chunked-html"
+                  -t chunkedhtml -o "$workdir/nixpkgs-chunked-html" \
+                  --lua-filter=nixpkgs-preprocess.lua
 
                 for file in "$workdir/nixpkgs-chunked-html"/*.html; do
                   local output_file="$(basename "$file")"
-                  pandoc "$file" --defaults="${pandoc-options}" --css="./style.css" \
-                    --highlight-style=monochrome \
-                    --variable header-includes="$highlight_style_tags" \
-                    --variable header-includes='<style>body > *:not(.book) { display: none; }</style>' \
-                    --metadata menu_description="nixpkgs" \
-                     -o "nixpkgs/$output_file"
+                  pandoc "$file" -o "nixpkgs/$output_file" \
+                    --defaults=create-docset.yaml \
+                    --css="./style.css" \
+                    --metadata database_file="$database_file" \
+                    --metadata menu_description="nixpkgs"
                 done
 
                 popd
-
-                mv "$dirname/Contents/Resources/Documents/docSet.dsidx" "$dirname/Contents/Resources/docSet.dsidx"
-                
-                cp "${pkgs.nixos-icons}/share/icons/hicolor/16x16/apps/nix-snowflake.png" "$dirname/icon.png"
-                cp "${pkgs.nixos-icons}/share/icons/hicolor/32x32/apps/nix-snowflake.png" "$dirname/icon@2x.png"
-
                 runHook postBuild
               '';
 

@@ -1,0 +1,5 @@
+standalone: true
+defaults:
+  - highlighting-css.yaml
+filters:
+  - docset.lua
