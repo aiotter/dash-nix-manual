@@ -60,6 +60,7 @@
               nativeBuildInputs = with pkgs; [
                 sqlite
                 pandoc
+                unzip
               ];
 
               srcs = [
@@ -139,8 +140,9 @@
                 cp -r "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/style.css" ./nixpkgs
 
                 pandoc "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/index.html" \
-                  -t chunkedhtml -o "$workdir/nixpkgs-chunked-html" \
+                  -t chunk-writer.lua -o "$workdir/nixpkgs.zip" \
                   --lua-filter=nixpkgs-preprocess.lua
+                unzip "$workdir/nixpkgs.zip" -d "$workdir/nixpkgs-chunked-html"
 
                 for file in "$workdir/nixpkgs-chunked-html"/*.html; do
                   local output_file="$(basename "$file")"
