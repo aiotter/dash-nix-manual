@@ -13,7 +13,7 @@ local function starts_with(str, prefix)
 end
 
 local function percent_encode(str)
-  return str:gsub("([^%w])", function(c) string.format("%%%02X", string.byte(c)) end)
+  return str:gsub("([^%w])", function(c) return string.format("%%%02X", string.byte(c)) end)
 end
 
 local function Header(elem)
@@ -35,7 +35,10 @@ local function Header(elem)
   end
 
   local heading = pandoc.utils.stringify(elem)
-  local display_name = heading:gsub("^.*%.(.+)$", "%1")  -- lib.string.escape -> escape
+
+  -- lib.string.escape -> escape
+  local display_name = type == "Function" and heading:gsub("^.*%.(.+)$", "%1") or heading
+
   local id = string.format("//apple_ref/cpp/%s/%s", type, percent_encode(display_name))
 
   -- Insert <a name="//apple_ref/cpp/Entry Type/Entry Name" class="dashAnchor"></a>
