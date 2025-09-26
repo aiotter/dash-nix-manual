@@ -6,6 +6,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <title>$if(title-prefix)$$title-prefix$ – $endif$$pagetitle$</title>
   <link rel="stylesheet" href="./style.css" />
+  <style>
+    $if(displaymath-css)$
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    $endif$
+    $if(highlighting-css)$
+    /* CSS for syntax highlighting */
+    $highlighting-css$
+    $endif$
+  </style>
 $for(header-includes)$
   $header-includes$
 $endfor$
