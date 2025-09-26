@@ -1,3 +1,4 @@
+reader: html+raw_html
 writer: chunk-writer.lua
 standalone: true
 defaults:
