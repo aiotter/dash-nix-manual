@@ -2,4 +2,5 @@ standalone: true
 defaults:
   - highlighting-css.yaml
 filters:
+  - tag-header.lua
   - docset.lua

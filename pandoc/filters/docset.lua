@@ -8,40 +8,20 @@ local metadata = {
   menu_description = nil,
 }
 
-local function starts_with(str, prefix)
-  return str and str:sub(1, #prefix) == prefix
-end
 
 local function percent_encode(str)
   return str:gsub("([^%w])", function(c) return string.format("%%%02X", string.byte(c)) end)
 end
 
 local function Header(elem)
-  if elem.level > 2 then return nil end
+  if elem.attributes.type == nil then return nil end
 
-  local type
-  if starts_with(elem.identifier, "function-") then
-    type = "Function"
-  elseif starts_with(elem.identifier, "constant-") then
-    type = "Constant"
-  elseif starts_with(elem.identifier, "sec-functions-library-") then
-    type = "Module"
-  elseif starts_with(elem.identifier, "sec-") then
-    type = "Section"
-  elseif elem.level == 1 then
-    type = "Guide"
-  else
-    return nil
-  end
-
+  local type = elem.attributes.type
   local heading = pandoc.utils.stringify(elem)
-
-  -- lib.string.escape -> escape
-  local display_name = type == "Function" and heading:gsub("^.*%.(.+)$", "%1") or heading
-
-  local id = string.format("//apple_ref/cpp/%s/%s", type, percent_encode(display_name))
+  local display_name = elem.attributes.display_name or heading
 
   -- Insert <a name="//apple_ref/cpp/Entry Type/Entry Name" class="dashAnchor"></a>
+  local id = string.format("//apple_ref/cpp/%s/%s", type, percent_encode(display_name))
   elem.content:insert(1, pandoc.Link({}, "", "", { class = "dashAnchor", name = id }))
 
   local sql = string.format(
