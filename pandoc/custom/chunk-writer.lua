@@ -1,45 +1,40 @@
-FORMAT = "chunkedhtml"
-
-function list_header_ids(blocks)
-  local ids = {}
-  blocks:walk({
-    Header = function(elem)
-      if elem.attributes.id then
-        table.insert(ids, elem.attributes.id)
-      end
-    end,
-  })
-  return ids
-end
+Template = pandoc.template.get("nixpkgs.html")
+template = pandoc.template.compile(Template)
 
 function ByteStringWriter(doc, opts)
-  doc = doc:walk({
-    Header = function(elem)
-      -- elem.identifier will be deleted by unknown reason while split_into_chunks;
-      -- so we'll save it on elem.attributes.id for later use
-      elem.attributes.id = elem.identifier
-      return elem
-    end
-  })
-
-  local chunked = pandoc.structure.split_into_chunks(doc, {
-    path_template = opts.chunk_template,
-    number_sections = true,
-    base_heading_level = 1
-  })
+  local main_pred = function(elem) return elem.classes == pandoc.List({ "book" }) end
+  local main = doc.blocks:find_if(main_pred, 1)
+  
+  local top_page = pandoc.Blocks({table.unpack(main.content, 1, 3)}, doc.metadata)
+  local pages = {top_page, table.unpack(main.content, 4)}
 
   local id_to_path = {}
-  for chunk_number, chunk in pairs(chunked.chunks) do
-    for _, id in pairs(list_header_ids(chunk.contents)) do
-      id_to_path[id] = chunk.path
+  for i, page in pairs(pages) do
+    local filename
+    local meta = doc.meta
+    if i == 1 then
+      meta.outputfile = "index.html"
+    else
+      meta.outputfile = string.format("%d.html", i)
     end
+
+    page:walk({
+      Header = function(elem)
+        id_to_path[elem.identifier] = meta.outputfile
+      end,
+    })
+
+    page = pandoc.Div(page, { class = "book" })
+    pages[i] = pandoc.Pandoc(page, meta)
   end
 
   local entries = {}
-  for _, chunk in pairs(chunked.chunks) do
-    -- Fix link (index.html#id -> generated_chunk.html#id)
-    chunk.contents = chunk.contents:walk({
+  for i, page in pairs(pages) do
+    local filename = page.meta.outputfile
+
+    page = page:walk({
       Link = function(elem)
+        -- fix links between generated pages
         local prefix = "index.html#"
         if elem.target:sub(1, #prefix) == prefix then
           local id = elem.target:sub(#prefix + 1)
@@ -49,14 +44,28 @@ function ByteStringWriter(doc, opts)
       end
     })
 
-    local template = pandoc.template.compile(pandoc.template.default("chunkedhtml"))
+    if doc.meta.outputdir then
+      page.meta.outputfile = pandoc.path.join({doc.meta.outputdir, filename})
+    end
 
-    local meta = chunked.meta
-    meta.title = pandoc.utils.stringify(chunk.heading)
+    -- apply filter if meta.filter is given
+    local filters = page.meta.filter or {}
+    if type(filters) == "string" then
+      filters = {filters}
+    end
+    for _, filter in pairs(filters) do
+      local filter_path
+      if os.execute(string.format("test -f '%s'", filter)) then
+        filter_path = filter
+      else
+        filter_path = pandoc.path.join({PANDOC_STATE.user_data_dir, "filters", filter})
+      end
 
-    local doc = pandoc.Pandoc(chunk.contents, meta)
-    local text = pandoc.write(doc, "html", { template = template })
-    local entry = pandoc.zip.Entry(chunk.path, text)
+      page = pandoc.utils.run_lua_filter(page, filter_path)
+    end
+
+    local text = pandoc.write(page, "html", { template = template })
+    local entry = pandoc.zip.Entry(filename, text)
     table.insert(entries, entry)
   end
 
@@ -64,4 +73,3 @@ function ByteStringWriter(doc, opts)
   return archive:bytestring()
 end
 
-Template = pandoc.template.default("chunkedhtml")

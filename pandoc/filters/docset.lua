@@ -19,6 +19,7 @@ local function Header(elem)
   local type = elem.attributes.type
   local heading = pandoc.utils.stringify(elem)
   local display_name = elem.attributes.display_name or heading
+  local file_path = metadata.outputfile or PANDOC_STATE.output_file
 
   -- Insert <a name="//apple_ref/cpp/Entry Type/Entry Name" class="dashAnchor"></a>
   local id = string.format("//apple_ref/cpp/%s/%s", type, percent_encode(display_name))
@@ -32,7 +33,7 @@ local function Header(elem)
       string.format("<dash_entry_name=%s>", display_name),
       string.format("<dash_entry_originalName=%s>", heading),
       string.format("<dash_entry_menuDescription=%s>", metadata.menu_description or heading:gsub("^(.*)%..+$", "%1")),
-      string.format("./%s#%s", PANDOC_STATE.output_file, id),
+      string.format("./%s#%s", file_path, id),
     }):gsub("'", "''")
   )
   table.insert(sql_statements, sql)

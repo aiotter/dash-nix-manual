@@ -5,12 +5,7 @@
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <title>$if(title-prefix)$$title-prefix$ – $endif$$pagetitle$</title>
-  <style>
-    $styles.html()$
-  </style>
-$for(css)$
-  <link rel="stylesheet" href="$css$" />
-$endfor$
+  <link rel="stylesheet" href="./style.css" />
 $for(header-includes)$
   $header-includes$
 $endfor$
@@ -22,14 +17,6 @@ $endif$
 $for(include-before)$
 $include-before$
 $endfor$
-$if(toc)$
-<nav id="$idprefix$TOC" role="doc-toc">
-$if(toc-title)$
-<h2 id="$idprefix$toc-title">$toc-title$</h2>
-$endif$
-$table-of-contents$
-</nav>
-$endif$
 $body$
 $for(include-after)$
 $include-after$

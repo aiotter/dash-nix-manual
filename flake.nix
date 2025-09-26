@@ -140,18 +140,11 @@
                 cp -r "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/style.css" ./nixpkgs
 
                 pandoc "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/index.html" \
-                  -t chunk-writer.lua -o "$workdir/nixpkgs.zip" \
-                  --lua-filter=nixpkgs-preprocess.lua
-                unzip "$workdir/nixpkgs.zip" -d "$workdir/nixpkgs-chunked-html"
+                  -o "$workdir/nixpkgs.zip" \
+                  --defaults=nixpkgs.yaml --metadata outputdir=nixpkgs \
+                  --metadata database_file="$database_file"
+                unzip "$workdir/nixpkgs.zip" -d ./nixpkgs
 
-                for file in "$workdir/nixpkgs-chunked-html"/*.html; do
-                  local output_file="$(basename "$file")"
-                  pandoc "$file" -o "nixpkgs/$output_file" \
-                    --defaults=create-docset.yaml \
-                    --css="./style.css" \
-                    --metadata database_file="$database_file" \
-                    --metadata menu_description="nixpkgs"
-                done
 
                 popd
                 runHook postBuild

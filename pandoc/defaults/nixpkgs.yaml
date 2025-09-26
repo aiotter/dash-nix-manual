@@ -1,0 +1,9 @@
+writer: chunk-writer.lua
+standalone: true
+defaults:
+  highlighting-css.yaml
+metadata:
+  # outputdir: nixpkgs
+  filter: docset.lua
+filters:
+  - tag-header.lua
