@@ -1,3 +1,5 @@
+-- Adds records to the sqlite3 database file based on "data-type" attribute of the HTML header tags.
+
 local sql_statements = {
   "CREATE TABLE IF NOT EXISTS searchIndex(id INTEGER PRIMARY KEY, name TEXT, type TEXT, path TEXT);",
   "CREATE UNIQUE INDEX IF NOT EXISTS anchor ON searchIndex (name, type, path);",

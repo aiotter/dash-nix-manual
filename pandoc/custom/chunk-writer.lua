@@ -1,3 +1,5 @@
+-- Custom writer to create zip file which contains chunked html from nixpkgs manual
+
 Template = pandoc.template.get("nixpkgs.html")
 template = pandoc.template.compile(Template)
 

@@ -1,3 +1,5 @@
+# Adds HTML anchor and creates splite3 database file for Dash docset.
+
 standalone: true
 defaults:
   - highlighting-css.yaml

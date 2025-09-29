@@ -1,3 +1,5 @@
+-- Custom reader to parse json file from `nix __dump-language` command
+
 local function unescape(s)
   local result = s:gsub("\\(.)", {
     a = "\a", b = "\b", f = "\f", n = "\n", r = "\r", t = "\t", v = "\v",

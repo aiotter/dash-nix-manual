@@ -1,3 +1,5 @@
+-- Adds "data-type" attributes to header tags.
+
 traverse = "topdown"
 
 local function starts_with(str, prefix)

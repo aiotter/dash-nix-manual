@@ -1,3 +1,6 @@
+# Split nixpkgs manuals into chunks and create zip file.
+# additional metadata to be specified: outputdir(mandatory), database_file(optional)
+
 reader: html+raw_html
 writer: chunk-writer.lua
 standalone: true
