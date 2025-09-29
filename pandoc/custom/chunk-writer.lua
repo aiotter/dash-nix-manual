@@ -41,7 +41,13 @@ function ByteStringWriter(doc, opts)
           elem.target = (id_to_path[id] or "") .. elem.target:sub(#prefix)
         end
         return elem
-      end
+      end,
+
+      RawBlock = function(elem)
+        -- open every <details> tag
+        elem.text = elem.text:gsub("^<details", "<details open", 1)
+        return elem
+      end,
     })
 
     if doc.meta.outputdir then
