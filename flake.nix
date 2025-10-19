@@ -110,7 +110,6 @@
 
 
                 local workdir="$(pwd)"
-                local database_file="$workdir/$dirname/Contents/Resources/docSet.dsidx"
                 pushd "$dirname/Contents/Resources/Documents"
 
 
@@ -120,19 +119,16 @@
                   local title="nixpkgs.lib.$(basename "$file" .md)"
                   local output_file="$(basename "$file" .md).html"
                   pandoc "$file" -o "nixpkgs-lib/$output_file" \
-                    --defaults=create-docset.yaml \
+                    --defaults=create-docset-html.yaml \
                     --defaults=add-margin-to-code-block.yaml \
-                    --metadata database_file="$database_file" \
-                    --metadata title="$title" \
-                    --metadata menu_description="$title"
+                    --metadata title="$title"
                 done
 
 
                 # Generate document for "builtins"
                 pandoc "$workdir/${builtins-html.name}/builtins.html" -o "builtins.html" \
-                  --defaults=create-docset.yaml \
-                  --defaults=add-margin-to-code-block.yaml \
-                  --metadata database_file="$database_file"
+                  --defaults=create-docset-html.yaml \
+                  --defaults=add-margin-to-code-block.yaml
 
 
                 # Generate document for "nixpkgs"
@@ -141,10 +137,13 @@
 
                 pandoc "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/index.html" \
                   -o "$workdir/nixpkgs.zip" \
-                  --defaults=nixpkgs.yaml --metadata outputdir=nixpkgs \
-                  --metadata database_file="$database_file"
+                  --defaults=nixpkgs.yaml --metadata outputdir=nixpkgs
                 unzip "$workdir/nixpkgs.zip" -d ./nixpkgs
 
+
+                # Generate sqlite3 database file
+                local database_file="$workdir/$dirname/Contents/Resources/docSet.dsidx"
+                find . -name '*.html' | xargs -n1 pandoc -t sql-writer.lua | sqlite3 "$database_file"
 
                 popd
                 runHook postBuild

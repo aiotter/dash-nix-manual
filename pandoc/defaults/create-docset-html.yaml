@@ -1,0 +1,8 @@
+# Adds HTML anchor for Dash docset.
+
+standalone: true
+defaults:
+  - highlighting-css.yaml
+filters:
+  - tag-header.lua
+  - add-docset-anchor.lua

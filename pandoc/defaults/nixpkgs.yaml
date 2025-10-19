@@ -8,6 +8,6 @@ defaults:
   highlighting-css.yaml
 metadata:
   # outputdir: nixpkgs
-  filter: docset.lua
+  filter: add-docset-anchor.lua
 filters:
   - tag-header.lua
