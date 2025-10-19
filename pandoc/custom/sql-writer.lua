@@ -32,7 +32,7 @@ function Writer(doc, opts)
       local menu_description = metadata.menu_description or heading:gsub("^(.*)%..+$", "%1")
 
       local sql = string.format(
-        "INSERT OR IGNORE INTO searchIndex(name, type, path) VALUES ('%s', '%s', '%s');",
+        "INSERT INTO searchIndex(name, type, path) VALUES ('%s', '%s', '%s');",
         heading:gsub("'", "''"),
         type,
         table.concat({
