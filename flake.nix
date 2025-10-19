@@ -16,13 +16,59 @@
         {
           default = self.packages.${system}.docset;
 
+          pandoc-xdg-data = pkgs.callPackage ./pandoc { };
+
           nix-doc = pkgs.nix.out.doc;
           nixpkgs-doc = pkgs.nixpkgs-manual;
 
+          nixpkgs-docset-html =
+            with self.packages.${system};
+            pkgs.runCommandNoCC "nixpkgs-docset-html-${nixpkgs-version}"
+              {
+                XDG_DATA_HOME = pandoc-xdg-data;
+                nativeBuildInputs = with pkgs; [
+                  pandoc
+                  unzip
+                ];
+                input = self.packages.${system}.builtins-json;
+                reader = ./pandoc/custom/builtins-reader.lua;
+              }
+              ''
+                mkdir -p "$out"
+                cp -r "${nixpkgs-doc}/share/doc/nixpkgs/style.css" "$out/style.css"
+
+                pandoc "${nixpkgs-doc}/share/doc/nixpkgs/index.html" \
+                  -o nixpkgs.zip --defaults=nixpkgs.yaml --metadata outputdir=nixpkgs
+                unzip nixpkgs.zip -d "$out"
+              '';
+
           nixpkgs-lib-markdown = pkgs.nixpkgs-manual.lib-docs;
 
+          nixpkgs-lib-docset-html =
+            with self.packages.${system};
+            pkgs.runCommandNoCC "nixpkgs-lib-docset-html-${nixpkgs-version}"
+              {
+                XDG_DATA_HOME = pandoc-xdg-data;
+                nativeBuildInputs = with pkgs; [ pandoc ];
+                input = self.packages.${system}.builtins-json;
+                reader = ./pandoc/custom/builtins-reader.lua;
+              }
+              ''
+                mkdir -p "$out"
+
+                for file in "${nixpkgs-lib-markdown}"/*.md; do
+                  [[ "$(basename "$file")" = "index.md" ]] && continue
+
+                  local title="nixpkgs.lib.$(basename "$file" .md)"
+                  pandoc "$file" -o "$out/$(basename "$file" .md).html" \
+                    --defaults=create-docset-html.yaml \
+                    --defaults=add-margin-to-code-block.yaml \
+                    --metadata title="$title"
+                done
+              '';
+
           builtins-json =
-            pkgs.runCommandNoCC "nix-builtins-json-${nix-version}"
+            pkgs.runCommandNoCC "nix-builtins-json"
               {
                 nativeBuildInputs = [ pkgs.nixVersions.latest ];
 
@@ -38,16 +84,20 @@
                 nix __dump-language >"$out/builtins.json"
               '';
 
-          builtins-html =
-            pkgs.runCommandNoCC "nix-builtins-html-${nix-version}"
+          builtins-docset-html =
+            with self.packages.${system};
+            pkgs.runCommandNoCC "nix-builtins-docset-html-${nix-version}"
               {
+                XDG_DATA_HOME = pandoc-xdg-data;
                 nativeBuildInputs = with pkgs; [ pandoc ];
                 input = self.packages.${system}.builtins-json;
-                reader = ./pandoc/custom/builtins-reader.lua;
               }
               ''
                 mkdir -p "$out"
-                pandoc --standalone -f "$reader" -t html "$input/builtins.json" >"$out/builtins.html"
+                pandoc "${builtins-json}/builtins.json" \
+                  -f builtins-reader.lua -o "$out/builtins.html" \
+                  --defaults=create-docset-html.yaml \
+                  --defaults=add-margin-to-code-block.yaml
               '';
 
           docset =
@@ -57,46 +107,19 @@
               pname = "nix-docset";
               version = "nix-${nix-version}+nixpkgs-${nixpkgs-version}";
 
+              XDG_DATA_HOME = pandoc-xdg-data;
+
+              srcs = [
+                builtins-docset-html
+                nixpkgs-docset-html
+                nixpkgs-lib-docset-html
+              ];
+              sourceRoot = ".";
+
               nativeBuildInputs = with pkgs; [
                 sqlite
                 pandoc
-                unzip
               ];
-
-              srcs = [
-                nixpkgs-lib-markdown
-                builtins-html
-                nixpkgs-doc
-              ];
-
-              sourceRoot = ".";
-              postUnpack = "rm ${nixpkgs-lib-markdown.name}/index.md";
-
-              XDG_DATA_HOME = pkgs.symlinkJoin {
-                name = "xdg_data_home";
-                paths = [
-                  (pkgs.lib.fileset.toSource {
-                    root = ./.;
-                    fileset = ./pandoc;
-                  })
-                  (pkgs.runCommandCC "pandoc-highlighting-css" { nativeBuildInputs = [ pkgs.pandoc ]; } ''
-                    mkdir -p "$out/pandoc/defaults"
-                    echo '$highlighting-css$' >highlight.template.css
-                    echo $'```html\n<p>placeholder</p>\n```' >placeholder.md
-
-                    cat <<-EOF >"$out/pandoc/defaults/highlighting-css.yaml"
-                    	variables:
-                    	  highlighting-css: |
-                    	    @media (prefers-color-scheme: light) {
-                    	      $(pandoc --highlight-style=haddock --template=highlight.template.css placeholder.md | sed 's/^/      /')
-                    	    }
-                    	    @media (prefers-color-scheme: dark) {
-                    	      $(pandoc --highlight-style=espresso --template=highlight.template.css placeholder.md | sed 's/^/      /')
-                    	    }
-                    EOF
-                  '')
-                ];
-              };
 
               dirname = "nix.docset";
 
@@ -108,42 +131,12 @@
                 cp "${pkgs.nixos-icons}/share/icons/hicolor/16x16/apps/nix-snowflake.png" "$dirname/icon.png"
                 cp "${pkgs.nixos-icons}/share/icons/hicolor/32x32/apps/nix-snowflake.png" "$dirname/icon@2x.png"
 
-
-                local workdir="$(pwd)"
                 pushd "$dirname/Contents/Resources/Documents"
 
-
-                # Generate document for "nixpkgs.lib"
-                mkdir nixpkgs-lib
-                for file in "$workdir/${nixpkgs-lib-markdown.name}"/*.md; do
-                  local title="nixpkgs.lib.$(basename "$file" .md)"
-                  local output_file="$(basename "$file" .md).html"
-                  pandoc "$file" -o "nixpkgs-lib/$output_file" \
-                    --defaults=create-docset-html.yaml \
-                    --defaults=add-margin-to-code-block.yaml \
-                    --metadata title="$title"
-                done
-
-
-                # Generate document for "builtins"
-                pandoc "$workdir/${builtins-html.name}/builtins.html" -o "builtins.html" \
-                  --defaults=create-docset-html.yaml \
-                  --defaults=add-margin-to-code-block.yaml
-
-
-                # Generate document for "nixpkgs"
-                mkdir nixpkgs
-                cp -r "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/style.css" ./nixpkgs
-
-                pandoc "$workdir/${nixpkgs-doc.name}/share/doc/nixpkgs/index.html" \
-                  -o "$workdir/nixpkgs.zip" \
-                  --defaults=nixpkgs.yaml --metadata outputdir=nixpkgs
-                unzip "$workdir/nixpkgs.zip" -d ./nixpkgs
-
+                find ''${srcs[@]} -maxdepth 1 -mindepth 1 -exec cp {} . \;
 
                 # Generate sqlite3 database file
-                local database_file="$workdir/$dirname/Contents/Resources/docSet.dsidx"
-                find . -name '*.html' | xargs -n1 pandoc -t sql-writer.lua | sqlite3 "$database_file"
+                find . -name '*.html' | xargs -n1 pandoc -t sql-writer.lua | sqlite3 ../docSet.dsidx
 
                 popd
                 runHook postBuild
