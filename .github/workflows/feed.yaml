@@ -1,0 +1,49 @@
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}nix.xml
+    steps:
+      - uses: actions/checkout@v5
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - run: nix run --print-build-logs
+      - run: tar -cvzf nix.tgz nix.docset
+
+      - uses: actions/upload-artifact@v4
+        id: upload-artifact
+        with:
+          name: nix.docset.tgz
+          path: nix.tgz
+          if-no-files-found: error
+
+      - name: create static contents
+        run: |
+          mkdir output
+          mv nix.tgz output
+
+          sha=${{ github.sha }}
+
+          cat <<EOF >output/nix.xml
+          <entry>
+          <version>${{ github.run_number }}+${sha:0:7}</version>
+          <url>https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/nix.tgz</url>
+          </entry>
+          EOF
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./output
+
+      - uses: actions/deploy-pages@v4
+        id: deployment
